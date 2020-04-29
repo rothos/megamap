@@ -1,6 +1,16 @@
 # This script requires Python 3 (I am running Python 3.7).
 # $ python3 gen.py
 
+# In order to make this great:
+# - syntax highlighting options
+#   (maybe different langs have diff bg colors)
+# - word wrapping options
+# - multiple file concat options
+# - image ratio output options
+#   (exact ratio? nearest? closest to square? blah)
+# - multicolumn gutter options
+# - border/framing options
+
 import drawSvg as draw
 
 filename = 'gen.py'
@@ -11,17 +21,17 @@ with open(filename) as f:
 
 # Remove trailing whitespace & replace tabs with spaces
 content = [x.rstrip() for x in content]
-content = [x.replace('\t','    ') for x in content]
+content = [x.replace('\t', '    ') for x in content]
 
 # Relevant variables
 numrows = len(content)
 numcols = 80
 textcolor = '#222222'
 bgcolor = '#ffffff'
-charheight = 3
+charheight = 2
 charwidth = 2
 linespacing = 1
-border = 3
+border = 5
 pixelscale = 1
 
 # Width & height of the whole drawing
@@ -60,7 +70,6 @@ for line in content:
 drawing.setPixelScale(pixelscale)
 drawing.saveSvg('example.svg')
 drawing.savePng('example.png')
-
 
 
 # from pygments import highlight
