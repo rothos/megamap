@@ -6,14 +6,17 @@
 #   (maybe different langs have diff bg colors)
 # - word wrapping options
 # - multiple file concat options
+# - filetype ordering / file sorting options
 # - image ratio output options
 #   (exact ratio? nearest? closest to square? blah)
-# - multicolumn gutter options
+# - multicolumn gutter options / vert spacing between files options
 # - border/framing options
+# - instead of drawing each pixel, should draw each word as a box
 
 import drawSvg as draw
+import math
 
-filename = 'gen.py'
+filename = 'codesample.txt'
 
 # Get the contents of the code file
 with open(filename) as f:
@@ -24,19 +27,20 @@ content = [x.rstrip() for x in content]
 content = [x.replace('\t', '    ') for x in content]
 
 # Relevant variables
-numrows = len(content)
-numcols = 80
+numpages = 5
+pagerows = math.ceil(len(content) / numpages)
+pagecols = 80
 textcolor = '#222222'
 bgcolor = '#ffffff'
-charheight = 2
-charwidth = 2
+charheight = 1
+charwidth = 1
 linespacing = 1
 border = 5
 pixelscale = 1
 
 # Width & height of the whole drawing
-width = numcols * charwidth + (2 * border)
-height = numrows * charheight + (2 * border) + (linespacing * (numrows - 1))
+width = (numpages+1)*border + numpages*pagecols*charwidth
+height = 2*border + pagerows*charheight + linespacing*(pagerows-1)
 
 # Create the drawing
 drawing = draw.Drawing(width, height, origin=(0,0), displayInline=False)
@@ -48,15 +52,27 @@ drawing.append(draw.Rectangle(0, 0, width, height, fill=bgcolor))
 def draw_pixel(drawing, x, y, charwidth, charheight, color):
     drawing.append(draw.Rectangle(x, y, charwidth, charheight, fill=color))
 
+# Initial coordinates
+page0 = 0
+x0 = border
+y0 = height - border
+x = x0
+y = y0
+page = page0
+
 # Loop & draw
-x = border
-y = height - border
-for line in content:
+for (i,line) in enumerate(content):
 
-    x = border
-    for (i,char) in enumerate(line):
+    if i > 0 and i % pagerows == 0:
+        # New page
+        page += border + pagecols*charwidth
+        y = y0
 
-        if i >= numcols - 2:
+    x = x0 + page
+
+    for (j,char) in enumerate(line):
+
+        if j >= pagecols:
             continue
 
         if char != ' ':
@@ -68,8 +84,8 @@ for line in content:
 
 # Save the drawing
 drawing.setPixelScale(pixelscale)
-drawing.saveSvg('example.svg')
 drawing.savePng('example.png')
+# drawing.saveSvg('example.svg')
 
 
 # from pygments import highlight
