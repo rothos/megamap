@@ -1,4 +1,4 @@
-# This script requires Python 3 (I have running Python 3.7).
+# This script requires Python 3 (I am running Python 3.7).
 # $ python3 gen.py
 
 import drawSvg as draw
@@ -14,47 +14,50 @@ content = [x.rstrip() for x in content]
 content = [x.replace('\t','    ') for x in content]
 
 # Relevant variables
-textcolor = '#222222'
-bgcolor = '#ffffff'
 numrows = len(content)
 numcols = 80
+textcolor = '#222222'
+bgcolor = '#ffffff'
 charheight = 3
 charwidth = 2
+linespacing = 1
+border = 3
+pixelscale = 1
 
-# Compute stuff
-width = numcols * charwidth
-height = numrows * charheight
+# Width & height of the whole drawing
+width = numcols * charwidth + (2 * border)
+height = numrows * charheight + (2 * border) + (linespacing * (numrows - 1))
 
 # Create the drawing
-drawing = draw.Drawing(width, height+2*charheight, origin=(0,0), displayInline=False)
+drawing = draw.Drawing(width, height, origin=(0,0), displayInline=False)
 
 # Draw the background
-drawing.append(draw.Rectangle(0, 0, width, height+2*charheight, fill=bgcolor))
+drawing.append(draw.Rectangle(0, 0, width, height, fill=bgcolor))
 
 # Pixel drawing funkitron
 def draw_pixel(drawing, x, y, charwidth, charheight, color):
     drawing.append(draw.Rectangle(x, y, charwidth, charheight, fill=color))
 
 # Loop & draw
-x = charwidth
-y = height
+x = border
+y = height - border
 for line in content:
 
-    x = charwidth
+    x = border
     for (i,char) in enumerate(line):
 
-        if i > numcols - 3:
+        if i >= numcols - 2:
             continue
 
         if char != ' ':
-            draw_pixel(drawing, x, y, charwidth, charheight, textcolor)
+            draw_pixel(drawing, x, y, charwidth, -charheight, textcolor)
 
         x += charwidth
 
-    y -= charheight
+    y -= charheight + linespacing
 
 # Save the drawing
-drawing.setPixelScale(2)
+drawing.setPixelScale(pixelscale)
 drawing.saveSvg('example.svg')
 drawing.savePng('example.png')
 
