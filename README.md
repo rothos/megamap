@@ -1,4 +1,7 @@
-<div style="width:100%;height:200px;background:url('https://raw.githubusercontent.com/rothos/megamap/master/statebus.png') center center no-repeat;"></div>
+<p align="center">
+  <img width="1231" height="300" src="https://raw.githubusercontent.com/rothos/megamap/master/banner.png">
+</p>
+
 
 # Megamap
 
@@ -58,6 +61,8 @@ opts = {
 opts["aspect_ratio"] = 1.5
 ```
 
+
+
 ## Pretty pictures
 
 These two images were created using the same input (this program's own source code)
@@ -76,6 +81,7 @@ Source code of entire projects can be elegantly illustrated:
 <p align="center">
   <img width="1232" height="791" src="https://raw.githubusercontent.com/rothos/megamap/master/statebus.png">
 </p>
+
 
 
 ## Questions I might ask myself in the future when I come back and look at this

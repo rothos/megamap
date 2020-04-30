@@ -28,7 +28,7 @@ opts = {
     "input_directory": 'input',
     "output_filename": 'output.png',
     "ignore_hidden": True,      # ignore hidden files & folders
-    "style": get_style_by_name('monokai'),
+    "style": get_style_by_name('solarized-dark'),
     "use_zebra_bg": False,      # if true, alternates bg colors among files
     "page_row_padding": 2,      # row units (includes linespacing)
     "page_col_padding": 4,      # column units
