@@ -2,43 +2,16 @@
 # PROLOGUE
 #-----------------------------------------------------------------------------
 
-# This script requires Python 3 (I am running Python 3.7) and several
-# packages. See imports below.
-#
-# $ python3 gen.py
-
-
-#-----------------------------------------------------------------------------
-# IF ONLY IF ONLY
-#-----------------------------------------------------------------------------
-
-# - syntax highlighting options
-#   (maybe different langs have diff bg colors)
-# - word wrapping options
-# - multiple file concat options
-# - filetype ordering / file sorting options
-# - image aspect ratio output options
-#   (exact ratio? nearest? closest to square? blah)
-# - multicolumn gutter options / vert spacing between files options
-# - border/framing options
-# - instead of drawing each pixel, should draw each word as a box
-# - since big images take a long time to produce, can we have a 'preview'
-#   feature that just saves e.g. the size & background colors (aka langs)?
-
-# # Get all styles from pygments
-# from pygments.styles import STYLE_MAP
-# STYLE_MAP.keys()
+# Did you read the README?
 
 
 #-----------------------------------------------------------------------------
 # BEEP BOOP INITIALIZING
 #-----------------------------------------------------------------------------
 
-import time
-import math
-import re
-import subprocess
-import pdb
+import time, math, re, pdb
+import os.path, subprocess
+from pathlib import Path
 import drawSvg as draw
 from pygments.lexers import guess_lexer, guess_lexer_for_filename
 from pygments.styles import get_style_by_name
@@ -52,15 +25,18 @@ start_time = time.time()
 #-----------------------------------------------------------------------------
 
 opts = {
-    "input_filename":  'sample.css',
-    "output_filename": 'example.png',
+    "input_directory": 'input',
+    "output_filename": 'output.png',
+    "ignore_hidden": True,      # ignore hidden files & folders
     "style": get_style_by_name('monokai'),
-    "pagecols":    80,
-    "border":      5,
-    "charheight":  1,
-    "charwidth":   1,
-    "linespacing": 1,
-    "pixelscale":  1
+    "use_zebra_bg": False,      # if true, alternates bg colors among files
+    "page_row_padding": 2,      # row units (includes linespacing)
+    "page_col_padding": 4,      # column units
+    "pagecols":    80,          # column units
+    "charheight":   1,          # px
+    "charwidth":    1,          # px
+    "linespacing":  1,          # px
+    "pixelscale":   1           # dimensionless
 }
 
 # Aspect ratio is width/height. The program will calculate things to make the
@@ -77,25 +53,36 @@ opts["aspect_ratio"] = 1.5
 def now_time():
     return "%.2fs  " % (time.time() - start_time)
 
-# Count the number of lines in a file
-# https://stackoverflow.com/questions/845058/how-to-get-line-count-of-a-large-file-cheaply-in-python
-def count_lines(filename):
-    out = subprocess.Popen(['wc', '-l', filename],
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT
-                         ).communicate()[0]
-    return int(out.partition(b' ')[0])
+# Get a list of the paths to all files we want to include in this thing.
+# We ignore filenames and directories beginning with a dot.
+def get_all_file_paths(dirname, ignore_hidden=True):
+    pathlist = []
+    for path in Path(dirname).rglob('*'):
+
+        # Ignore hidden files and directories
+        if ignore_hidden and (path.name[0] == '.' or str(path)[0] == '.'):
+            continue
+
+        # Ignore directories
+        if os.path.isdir(path):
+            continue
+
+        # She's a keeper
+        pathlist += [path]
+
+    return pathlist
 
 # Get the contents of a file
-def get_contents(filename):
-    print(now_time() + "Loading " + filename)
-    with open(filename) as f:
+def get_contents(path):
+    print(now_time() + "Loading " + path.name)
+    with open(path.absolute()) as f:
         contents = f.readlines()
 
     # Remove trailing whitespace & replace tabs with spaces
     contents = [line.rstrip() for line in contents]
     contents = [line.replace('\t', '    ') for line in contents]
 
+    # Return the blob
     return ('\n'.join(contents)).strip()
 
 # Calculate all the delicious dimensional variables.
@@ -144,12 +131,12 @@ def calc_page_and_image_vars(opts, total_rows):
 def calc_dimensions(opts, total_rows, numpages):
     pagerows = math.ceil(total_rows / numpages)
 
-    width = (numpages+1)*opts["border"] \
+    width = 2*numpages*opts["page_col_padding"]*opts["charwidth"] \
             + numpages*opts["pagecols"]*opts["charwidth"]
 
-    height = 2*opts["border"] \
+    height = 2*opts["page_row_padding"]*(opts["charheight"] + opts["linespacing"]) \
              + pagerows*opts["charheight"] \
-             + opts["linespacing"]*(pagerows-1)
+             + opts["linespacing"]*(pagerows - 1)
 
     return width, height
 
@@ -157,8 +144,31 @@ def calc_dimensions(opts, total_rows, numpages):
 def break_str_into_lines(string):
     return re.split(r'(\n)', string)
 
-# Token drawing funkitron
-def draw_token(drawing, x, y, width, height, color):
+# Lighten a color
+# - lighten(color, 1)    => color
+# - lighten(color, .95)  => something slightly lighter
+# - lighten(color, 1.05) => something slightly darker
+def lighten(hexcolor, fraction):
+    rgb = hex_to_rgb(hexcolor)
+    rgb = tuple(255 - fraction*(255 - float(c)) for c in rgb)
+    rgb = tuple(int(max(0,min(c,255))) for c in rgb)
+    return rgb_to_hex(rgb)
+
+# Convert a hex color to rgb
+def hex_to_rgb(hexcolor):
+    hexcolor = hexcolor.strip('#')
+    return tuple(int(hexcolor[i:i+2], 16) for i in (0, 2, 4))
+
+# Revert rgb color to hex
+def rgb_to_hex(rgb):
+    hexes = [hex(c)[2:] for c in rgb]
+    for (i, h) in enumerate(hexes):
+        if len(h) == 1:
+            hexes[i] = h + h
+    return '#' + ''.join(hexes)
+
+# The MVP of this program: a rectangle drawing funkitron
+def draw_rectangle(drawing, x, y, width, height, color):
     drawing.append(draw.Rectangle(x, y, width, height, fill=color))
 
 
@@ -167,28 +177,52 @@ def draw_token(drawing, x, y, width, height, color):
 #-----------------------------------------------------------------------------
 
 # Yeah ok let's make this easier here
-input_filename  = opts["input_filename"]
-output_filename = opts["output_filename"]
-style        = opts["style"]
-pagecols     = opts["pagecols"]
-border       = opts["border"]
-charheight   = opts["charheight"]
-charwidth    = opts["charwidth"]
-linespacing  = opts["linespacing"]
-pixelscale   = opts["pixelscale"]
-aspect_ratio = opts["aspect_ratio"]
+input_directory  = opts["input_directory"]
+output_filename  = opts["output_filename"]
+ignore_hidden    = opts["ignore_hidden"]
+style            = opts["style"]
+use_zebra_bg     = opts["use_zebra_bg"]
+page_row_padding = opts["page_row_padding"]
+page_col_padding = opts["page_col_padding"]
+pagecols         = opts["pagecols"]
+charheight       = opts["charheight"]
+charwidth        = opts["charwidth"]
+linespacing      = opts["linespacing"]
+pixelscale       = opts["pixelscale"]
+aspect_ratio     = opts["aspect_ratio"]
+
+# Get a list of all the file paths
+# For a given path in pathlist:
+# - path.name is the filename
+# - str(path) is the relative path
+# - path.absolute() is the absolute path
+pathlist = get_all_file_paths(input_directory, ignore_hidden)
+
+# Load up the contents of each file
+# Yeah, we hold it all in memory
+fileblobs = [get_contents(path) for path in pathlist]
+
+# A list of the line counts
+linecounts = [len(blob.split('\n')) for blob in fileblobs]
+
+# The total number of rows (lines) is the sum of the linecounts
+# plus the padding rows (two per file). This is actually an
+# upper bound, since some of the padding may be ignored if it
+# occurs at the bottom of the image (ie if pagebreak == filebreak).
+total_rows = sum(linecounts) + 2*page_row_padding*(len(pathlist) - 1)
+
+# Determine the number of pages we'll need in order to fit the aspect ratio
+numpages, pagerows, width, height, actual_ratio = calc_page_and_image_vars(opts, total_rows)
 
 # The style defines a bg color for us
 bgcolor = style.background_color
 
-# Count the rows in the code file
-total_rows = count_lines(input_filename)
+# Compute two shades, so we can alternate when file changes
+bgcolorlist = [lighten(bgcolor, 0.96), lighten(bgcolor, 1.02)]
 
-# Get the contents of the code file
-input_filecontent = get_contents(input_filename)
-
-# Determine the number of pages we'll need in order to fit the aspect ratio
-numpages, pagerows, width, height, ratio = calc_page_and_image_vars(opts, total_rows)
+# But do we *really* want the zebra?
+if not use_zebra_bg:
+    bgcolorlist = [bgcolor]
 
 # Create the drawing
 drawing = draw.Drawing(width, height, origin=(0,0), displayInline=False)
@@ -196,99 +230,170 @@ drawing = draw.Drawing(width, height, origin=(0,0), displayInline=False)
 # Draw the background
 drawing.append(draw.Rectangle(0, 0, width, height, fill=bgcolor))
 
-# Initial coordinates
-row0 = 0
-col0 = 0
-x0 = border
-y0 = height - border
-x = x0
-y = y0
-row = row0
-col = col0
-
-# Get the right lexer
-lexer = guess_lexer_for_filename(input_filename, input_filecontent)
-
-# Print the final ratio & the target
-print(now_time() + "Aspect ratio %.2f  (target %.2f)" % (ratio, aspect_ratio))
-
 
 #-----------------------------------------------------------------------------
 # MEGAMAP GO BRRR
 #-----------------------------------------------------------------------------
 
-# Buckle up, folks
-print(now_time() + "Drawing %s (%s) %i lines" % (input_filename, lexer.name, total_rows))
+# Print the final ratio & the target
+print(now_time() + "Aspect ratio %.2f  (target %.2f)" % (actual_ratio, aspect_ratio))
 
-# Wanna buy some tokens?
-tokensource = lexer.get_tokens(input_filecontent)
+# First, draw all the background colors
+# Initial coordinates
+row = row0 = 0
+x = 0
+dx = charwidth*(pagecols + 2*page_col_padding)
+y0 = height
+ya = yb = y0
+dy = page_row_padding*(charheight + linespacing)
 
-# So many tokens
-for (ttype, fulltoken) in tokensource:
+# Pretend to loop through the files, draw some bg rects
+i = 0
+for i in range(len(fileblobs)):
 
-    # Split the token into lines (kind of).
-    # (We use regex to split at '\n', but we keep the '\n'
-    # in the resulting array, and also sometimes there are
-    # empty strings in the array, if the token begins or
-    # ends with '\n'. Don't worry, it's chill.)
-    lines_kind_of = break_str_into_lines(fulltoken)
+    # If we've just finished a file,
+    # draw a freakin 'tangle
+    if i > 0:
 
-    # Loop through the lines
-    for (k, word) in enumerate(lines_kind_of):
+        # Add the inter-file padding
+        yb  -= 2*dy
+        row += 2*page_row_padding
 
-        # It happens sometimes
-        if word == '':
-            continue
+        # Draw a freakin 'tangle
+        draw_rectangle(drawing, x, ya, dx, yb-ya, bgcolorlist[(i-1) % len(bgcolorlist)])
 
-        # Break to the next line, resetting/updating the coordinates
-        if word == '\n':
+        # Reset the y_a coord
+        ya = yb
 
-            # Next line
-            y -= charheight + linespacing
-            row += 1
+    # Pretend to loop through lines
+    for j in range(linecounts[i]):
 
-            # We've fallen off the bottom of the page, so
-            # let's go to the top of the next page
-            if row >= pagerows:
-                x0 += border + pagecols*charwidth
-                row = row0
-                y = y0
+        # Next line
+        yb  -= charheight + linespacing
+        row += 1
 
-            # Reset the x coord
-            x = x0
-            col = col0
-            continue
+        # If we've fallen off the bottom of the page,
+        # let's go to the top of the next page
+        if row >= pagerows:
+            yb -= 2*dy
+            draw_rectangle(drawing, x, ya, dx, yb-ya, bgcolorlist[i % len(bgcolorlist)])
+            x += dx
+            row = row0
+            ya = yb = y0
 
-        # If we're off the right side of the page,
-        # keep going till we hit a newline
-        if col + 1 >= pagecols:
-            continue
+# Finish off dat last 'tangle
+# We draw to -ya because then it's guaranteed to go to the bottom of the drawing
+draw_rectangle(drawing, x, ya, dx, -ya, bgcolorlist[i % len(bgcolorlist)])
 
-        # This is whitespace
-        # Advance the x coord
-        if not len(word.strip()):
-            x += len(word)*charwidth
-            col += len(word)
+#-----------------------------------------------------------------------------
+# Ok now draw the word blockies
 
-        # Otherwise, this is a real live token
-        else:
-            # Get the color of the token. The ._styles attribute is a little
-            # hacky maybe, but less hacky than the .styles attribute, I think.
-            # The color is the first item in the list.
-            color = '#' + style._styles[ttype][0]
+# Initial coordinates
+row = col = row0 = col0 = 0
+x = x0 = page_col_padding*charwidth
+y = y0 = height - page_row_padding*(charheight + linespacing)
 
-            # If the word is longer than the rest of the space we have in this
-            # line, then cut it off.
-            wordlen = len(word)
-            if col + wordlen > pagecols:
-                wordlen = pagecols - col
+# Loop through each of the files & draw away
+for (i, blob) in enumerate(fileblobs):
 
-            # Draw the damn thing, finally.
-            draw_token(drawing, x, y, wordlen*charwidth, -charheight, color)
+    # If we've just finished a file & are starting
+    # to draw a new one, add some padding
+    if i > 0:
 
+        # Add the inter-file padding
+        y   -= 2*page_row_padding*(charheight + linespacing)
+        row += 2*page_row_padding
+
+        # If we've fallen off the bottom of the page,
+        # let's go to the top of the next page
+        if row >= pagerows:
+            x0 += charwidth*(pagecols + 2*page_col_padding)
+            row = row0
+            y = y0
+
+        # Reset the x coord
+        x = x0
+        col = col0
+
+    # Info about the current file
+    filepath = pathlist[i]
+    linecount = linecounts[i]
+
+    # Get the right lexer
+    lexer = guess_lexer_for_filename(filepath.name, blob)
+
+    # Buckle up, folks
+    print(now_time() + "Drawing %s (%s) %i lines" % (filepath.name, lexer.name, linecount))
+
+    # Wanna buy some tokens?
+    tokensource = lexer.get_tokens(blob)
+
+    # So many tokens
+    for (ttype, fulltoken) in tokensource:
+
+        # Split the token into lines (kind of).
+        # (We use regex to split at '\n', but we keep the '\n'
+        # in the resulting array, and also sometimes there are
+        # empty strings in the array, if the token begins or
+        # ends with '\n'. Don't worry, it's chill.)
+        lines_kind_of = break_str_into_lines(fulltoken)
+
+        # Loop through the lines in this token
+        for (k, word) in enumerate(lines_kind_of):
+
+            # It happens sometimes
+            if word == '':
+                continue
+
+            # Break to the next line, resetting/updating the coordinates
+            if word == '\n':
+
+                # Next line
+                y   -= charheight + linespacing
+                row += 1
+
+                # If we've fallen off the bottom of the page,
+                # let's go to the top of the next page
+                if row >= pagerows:
+                    x0 += charwidth*(pagecols + 2*page_col_padding)
+                    row = row0
+                    y = y0
+
+                # Reset the x coord
+                x = x0
+                col = col0
+                continue
+
+            # If we're off the right side of the page,
+            # keep going till we hit a newline
+            if col + 1 >= pagecols:
+                continue
+
+            # This is whitespace
             # Advance the x coord
-            x += wordlen*charwidth
-            col += wordlen
+            if not len(word.strip()):
+                x += len(word)*charwidth
+                col += len(word)
+
+            # Otherwise, this is a real live token
+            else:
+                # Get the color of the token. The ._styles attribute is a little
+                # hacky maybe, but less hacky than the .styles attribute, I think.
+                # The color is the first item in the list.
+                color = '#' + style._styles[ttype][0]
+
+                # If the word is longer than the rest of the space we have in this
+                # line, then cut it off.
+                wordlen = len(word)
+                if col + wordlen > pagecols:
+                    wordlen = pagecols - col
+
+                # Draw the damn thing, finally.
+                draw_rectangle(drawing, x, y, wordlen*charwidth, -charheight, color)
+
+                # Advance the x coord
+                x += wordlen*charwidth
+                col += wordlen
 
 
 #-----------------------------------------------------------------------------
@@ -296,7 +401,8 @@ for (ttype, fulltoken) in tokensource:
 #-----------------------------------------------------------------------------
 
 # Save the drawing
-print(now_time() + "Saving " + output_filename)
+resx, resy = (width*pixelscale, height*pixelscale)
+print(now_time() + "Saving %s (%ix%ipx)" % (output_filename, resx, resy))
 drawing.setPixelScale(pixelscale)
 drawing.savePng(output_filename)
 
