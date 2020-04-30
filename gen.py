@@ -38,6 +38,7 @@ import time
 import math
 import re
 import subprocess
+import pdb
 import drawSvg as draw
 from pygments.lexers import guess_lexer, guess_lexer_for_filename
 from pygments.styles import get_style_by_name
@@ -50,18 +51,22 @@ start_time = time.time()
 # TELL ME WHAT YOU WANT BABY
 #-----------------------------------------------------------------------------
 
-input_filename = 'sample.css'
-output_filename = 'example.png'
-style = get_style_by_name('monokai')
-textcolor = '#222222'
-bgcolor = '#ffffff'
-numpages = 4
-pagecols = 80
-border = 5
-charheight = 1
-charwidth = 1
-linespacing = 1
-pixelscale = 2
+opts = {
+    "input_filename":  'sample.css',
+    "output_filename": 'example.png',
+    "style": get_style_by_name('monokai'),
+    "pagecols":    80,
+    "border":      5,
+    "charheight":  1,
+    "charwidth":   1,
+    "linespacing": 1,
+    "pixelscale":  1
+}
+
+# Aspect ratio is width/height. The program will calculate things to make the
+# aspect ratio as close as possible to what is specified. Right now it can't
+# guarantee exactness.
+opts["aspect_ratio"] = 1.5
 
 
 #-----------------------------------------------------------------------------
@@ -83,7 +88,7 @@ def count_lines(filename):
 
 # Get the contents of a file
 def get_contents(filename):
-    print(now_time() + "Loading " + filename + "...")
+    print(now_time() + "Loading " + filename)
     with open(filename) as f:
         contents = f.readlines()
 
@@ -93,18 +98,84 @@ def get_contents(filename):
 
     return '\n'.join(contents).strip()
 
+# Calculate all the delicious dimensional variables
+# (in kind of a dumb way)
+def calc_page_and_image_vars(opts, total_rows):
+    # Set our target & starting pagenum val
+    target = opts["aspect_ratio"]
+    numpages = [1]
+    k = 0
+
+    # Calculate the ratio for a single page
+    w, h = calc_dimensions(opts, total_rows, numpages[k])
+    width = [w]
+    height = [h]
+    ratio = [width[k]/height[k]]
+
+    # Now loop until we exceed our target
+    while ratio[k] < target:
+        k += 1
+        numpages += [k+1]
+        w, h = calc_dimensions(opts, total_rows, numpages[k])
+        width += [w]
+        height += [h]
+        ratio += [width[k]/height[k]]
+
+    # Which aspect ratio was better: the one just below the target,
+    # or the one just above?
+    if min(abs(target - ratio[k]), abs(target - ratio[k-1])) == abs(target - ratio[k]):
+        winner = k
+    else:
+        winner = k - 1
+
+    # Calculate the number of page rows
+    pagerows = math.ceil(total_rows / numpages[winner])
+
+    # Return all the goodies
+    return numpages[winner], pagerows, width[winner], height[winner], ratio[winner]
+
+# Calculate the dimensions of an image based on the given options
+# and a known number of pages
+def calc_dimensions(opts, total_rows, numpages):
+    border = opts["border"]
+    charwidth = opts["charwidth"]
+    charheight = opts["charheight"]
+    linespacing = opts["linespacing"]
+    pagecols = opts["pagecols"]
+    pagerows = math.ceil(total_rows / numpages)
+
+    width = (numpages+1)*border + numpages*pagecols*charwidth
+    height = 2*border + pagerows*charheight + linespacing*(pagerows-1)
+
+    return width, height
+
+# Break up a line into words
+def break_str_into_lines(string):
+    return re.split(r'(\n)', string)
+
 # Token drawing funkitron
 def draw_token(drawing, x, y, width, height, color):
     drawing.append(draw.Rectangle(x, y, width, height, fill=color))
-
-# Break up a line into words
-def break_line(line, col_limit):
-    return re.split(r'(\s+)', line[0:col_limit])
 
 
 #-----------------------------------------------------------------------------
 # PREPROCESSING
 #-----------------------------------------------------------------------------
+
+# Yeah ok let's make this easier here
+input_filename  = opts["input_filename"]
+output_filename = opts["output_filename"]
+style        = opts["style"]
+pagecols     = opts["pagecols"]
+border       = opts["border"]
+charheight   = opts["charheight"]
+charwidth    = opts["charwidth"]
+linespacing  = opts["linespacing"]
+pixelscale   = opts["pixelscale"]
+aspect_ratio = opts["aspect_ratio"]
+
+# The style defines a bg color for us
+bgcolor = style.background_color
 
 # Count the rows in the code file
 total_rows = count_lines(input_filename)
@@ -112,12 +183,8 @@ total_rows = count_lines(input_filename)
 # Get the contents of the code file
 input_filecontent = get_contents(input_filename)
 
-# Determine the number of page rows ( == lines of text on the whole image )
-pagerows = math.ceil(total_rows / numpages)
-
-# Width & height of the whole drawing
-width = (numpages+1)*border + numpages*pagecols*charwidth
-height = 2*border + pagerows*charheight + linespacing*(pagerows-1)
+# Determine the number of pages we'll need in order to fit the aspect ratio
+numpages, pagerows, width, height, ratio = calc_page_and_image_vars(opts, total_rows)
 
 # Create the drawing
 drawing = draw.Drawing(width, height, origin=(0,0), displayInline=False)
@@ -138,89 +205,86 @@ col = col0
 # Get the right lexer
 lexer = guess_lexer_for_filename(input_filename, input_filecontent)
 
+# Print the final ratio & the target
+print(now_time() + "Aspect ratio %.2f  (target %.2f)" % (ratio, aspect_ratio))
+
 
 #-----------------------------------------------------------------------------
 # MEGAMAP GO BRRR
 #-----------------------------------------------------------------------------
 
 # Buckle up, folks
-print(now_time() + "Drawing %s (%s)..." % (input_filename, lexer.name))
+print(now_time() + "Drawing %s (%s) %i lines" % (input_filename, lexer.name, total_rows))
 
 # Wanna buy some tokens?
 tokensource = lexer.get_tokens(input_filecontent)
 
 # So many tokens
-for (ttype, word) in tokensource:
+for (ttype, fulltoken) in tokensource:
 
-    if '\n' in word:
-        # Break to the next line
-        y -= charheight + linespacing
-        row += 1
+    # Split the token into lines (kind of).
+    # (We use regex to split at '\n', but we keep the '\n'
+    # in the resulting array, and also sometimes there are
+    # empty strings in the array, if the token begins or
+    # ends with '\n'. Don't worry, it's chill.)
+    lines_kind_of = break_str_into_lines(fulltoken)
 
-        if row >= pagerows:
-            # We've fallen off the bottom of the page
-            # Update the coords
-            x0 += border + pagecols*charwidth
-            row = row0
-            y = y0
+    # Loop through the lines
+    for (k, word) in enumerate(lines_kind_of):
 
-        # Reset the x coord
-        x = x0
-        col = col0
-        continue
+        # It happens sometimes
+        if word == '':
+            continue
 
-    if col >= pagecols:
+        # Break to the next line, resetting/updating the coordinates
+        if word == '\n':
+
+            # Next line
+            y -= charheight + linespacing
+            row += 1
+
+            # We've fallen off the bottom of the page, so
+            # let's go to the top of the next page
+            if row >= pagerows:
+                x0 += border + pagecols*charwidth
+                row = row0
+                y = y0
+
+            # Reset the x coord
+            x = x0
+            col = col0
+            continue
+
         # If we're off the right side of the page,
         # keep going till we hit a newline
-        continue
+        if col + 1 >= pagecols:
+            continue
 
-    if not len(word.strip()):
         # This is whitespace
         # Advance the x coord
-        x += len(word)*charwidth
+        if not len(word.strip()):
+            x += len(word)*charwidth
+            col += len(word)
 
-    else:
-        # This is a real live token
-        while ttype not in style.styles or not len(style.styles[ttype]):
-            ttype = ttype.parent
+        # Otherwise, this is a real live token
+        else:
+            # Get the color of the token. The ._styles attribute is a little
+            # hacky maybe, but less hacky than the .styles attribute, I think.
+            # The color is the first item in the list.
+            color = '#' + style._styles[ttype][0]
 
-        color = style.styles[ttype]
+            # If the word is longer than the rest of the space we have in this
+            # line, then cut it off.
+            wordlen = len(word)
+            if col + wordlen > pagecols:
+                wordlen = pagecols - col
 
-        wordlen = len(word)
-        if col + wordlen > pagecols:
-            wordlen = pagecols - col
+            # Draw the damn thing, finally.
+            draw_token(drawing, x, y, wordlen*charwidth, -charheight, color)
 
-        draw_token(drawing, x, y, wordlen*charwidth, -charheight, color)
-
-        # Advance the x coord
-        x += len(word)*charwidth
-        col += 1
-
-
-
-# # First, loop through the lines
-# for (i, line) in enumerate(content):
-
-#     if i > 0 and i % pagerows == 0:
-#         # New page
-#         page += border + pagecols*charwidth
-#         y = y0
-
-#     # Like a typewriter "return" key
-#     x = x0 + page
-
-#     # Loop through the words in a line
-#     words = break_line(line, pagecols)
-#     for (j, word) in enumerate(words):
-
-#         # If this word is not whitespace
-#         if len(word.strip()):
-#             # Draw the token
-#             draw_token(drawing, x, y, len(word)*charwidth, -charheight, textcolor)
-
-#         x += len(word)
-
-#     y -= charheight + linespacing
+            # Advance the x coord
+            x += wordlen*charwidth
+            col += wordlen
 
 
 #-----------------------------------------------------------------------------
@@ -228,10 +292,11 @@ for (ttype, word) in tokensource:
 #-----------------------------------------------------------------------------
 
 # Save the drawing
-print(now_time() + "Saving " + output_filename + "...")
+print(now_time() + "Saving " + output_filename)
 drawing.setPixelScale(pixelscale)
 drawing.savePng(output_filename)
 
+# Let's hope it was fast
 end_time = time.time()
 total_time = end_time - start_time
 print(now_time() + 'Done.')
