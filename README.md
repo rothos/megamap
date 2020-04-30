@@ -1,4 +1,6 @@
-## Megamap
+<div style="width:100%;height:200px;background:url('https://raw.githubusercontent.com/rothos/megamap/master/statebus.png') center center no-repeat;"></div>
+
+# Megamap
 
 Megamap is a mega awesome version of the minimap feature of text editors like
 Sublime and Atom. Give megamap a directory full of source code, and it will
@@ -6,7 +8,7 @@ produce a PNG image which is a beautiful birdseye view of all the source code.
 
 
 
-### Installation
+## Installation
 
 Download this repository. Make sure you have Python 3. Maybe you need Python
 3.6 or something, I don't know.
@@ -21,7 +23,7 @@ Maybe Cairo something too. It's 5am and I don't remember anything.
 
 
 
-### Getting started
+## Getting started
 
 Put your input (could be any text files; source code works well -- although
 maybe a book of poetry would be cool too) into a subdirectory of the project,
@@ -56,15 +58,29 @@ opts = {
 opts["aspect_ratio"] = 1.5
 ```
 
-### Pretty pictures
+## Pretty pictures
 
-[in progress]
+These two images were created using the same input (this program's own source code)
+with different parameters:
+
+<p align="center">
+  <img width="352" height="320" src="https://raw.githubusercontent.com/rothos/megamap/master/gen.py_1.png">
+</p>
+
+<p align="center">
+  <img width="402" height="288" src="https://raw.githubusercontent.com/rothos/megamap/master/gen.py_2.png">
+</p>
+
+Source code of entire projects can be elegantly illustrated:
+
+<p align="center">
+  <img width="1232" height="791" src="https://raw.githubusercontent.com/rothos/megamap/master/statebus.png">
+</p>
 
 
+## Questions I might ask myself in the future when I come back and look at this
 
-### Questions I might ask myself in the future when I come back and look at this
-
-##### How do I find out what all the syntax highlighting styles are called?
+### How do I find out what all the syntax highlighting styles are called?
 
 ```
 from pygments.styles import STYLE_MAP
@@ -75,17 +91,17 @@ I get this output:
 dict_keys(['default', 'emacs', 'friendly', 'colorful', 'autumn', 'murphy', 'manni', 'monokai', 'perldoc', 'pastie', 'borland', 'trac', 'native', 'fruity', 'bw', 'vim', 'vs', 'tango', 'rrt', 'xcode', 'igor', 'paraiso-light', 'paraiso-dark', 'lovelace', 'algol', 'algol_nu', 'arduino', 'rainbow_dash', 'abap', 'solarized-dark', 'solarized-light', 'sas', 'stata', 'stata-light', 'stata-dark', 'inkpot'])
 ```
 
-##### Can you sort the input files somehow?
+### Can you sort the input files somehow?
 
 The `pathlib` module seems to order them out randomly, it's weird. But yeah
 there is no built-in feature to do this. It wouldn't be hard to modify the
 code to do it.
 
-##### Is there a way to put a pretty border or frame around the image?
+### Is there a way to put a pretty border or frame around the image?
 
 Not right now. Try imagemagick or something. Or submit a pull request.
 
-##### What about word wrapping?
+### What about word wrapping?
 
 Hahahaha.
 
