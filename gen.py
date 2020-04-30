@@ -96,11 +96,16 @@ def get_contents(filename):
     contents = [line.rstrip() for line in contents]
     contents = [line.replace('\t', '    ') for line in contents]
 
-    return '\n'.join(contents).strip()
+    return ('\n'.join(contents)).strip()
 
-# Calculate all the delicious dimensional variables
-# (in kind of a dumb way)
+# Calculate all the delicious dimensional variables.
+# The way we do this is:
+# - set numpages = 1, calculate aspect ratio based on that
+# - while aspect ratio < target, numpages += 1
+# - when we exceed target, determine whether the better
+#   aspect ratio was before or after we hit the target
 def calc_page_and_image_vars(opts, total_rows):
+
     # Set our target & starting pagenum val
     target = opts["aspect_ratio"]
     numpages = [1]
@@ -137,15 +142,14 @@ def calc_page_and_image_vars(opts, total_rows):
 # Calculate the dimensions of an image based on the given options
 # and a known number of pages
 def calc_dimensions(opts, total_rows, numpages):
-    border = opts["border"]
-    charwidth = opts["charwidth"]
-    charheight = opts["charheight"]
-    linespacing = opts["linespacing"]
-    pagecols = opts["pagecols"]
     pagerows = math.ceil(total_rows / numpages)
 
-    width = (numpages+1)*border + numpages*pagecols*charwidth
-    height = 2*border + pagerows*charheight + linespacing*(pagerows-1)
+    width = (numpages+1)*opts["border"] \
+            + numpages*opts["pagecols"]*opts["charwidth"]
+
+    height = 2*opts["border"] \
+             + pagerows*opts["charheight"] \
+             + opts["linespacing"]*(pagerows-1)
 
     return width, height
 
