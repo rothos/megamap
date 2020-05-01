@@ -26,7 +26,7 @@ start_time = time.time()
 
 opts = {
     "input_directory": 'input',
-    "output_filename": 'output.png',
+    "output_filename": 'output/output.png',
     "ignore_hidden": True,      # ignore hidden files & folders
     "style": get_style_by_name('solarized-dark'),
     "use_zebra_bg": False,      # if true, alternates bg colors among files
@@ -339,61 +339,64 @@ for (i, blob) in enumerate(fileblobs):
         lines_kind_of = break_str_into_lines(fulltoken)
 
         # Loop through the lines in this token
-        for (k, word) in enumerate(lines_kind_of):
+        # for word in lines_kind_of:
+        for line in lines_kind_of:
 
-            # It happens sometimes
-            if word == '':
-                continue
+            for word in re.split(r'( )', line):
 
-            # Break to the next line, resetting/updating the coordinates
-            if word == '\n':
+                # It happens sometimes
+                if word == '':
+                    continue
 
-                # Next line
-                y   -= charheight + linespacing
-                row += 1
+                # Break to the next line, resetting/updating the coordinates
+                if word == '\n':
 
-                # If we've fallen off the bottom of the page,
-                # let's go to the top of the next page
-                if row >= pagerows:
-                    x0 += charwidth*(pagecols + 2*page_col_padding)
-                    row = row0
-                    y = y0
+                    # Next line
+                    y   -= charheight + linespacing
+                    row += 1
 
-                # Reset the x coord
-                x = x0
-                col = col0
-                continue
+                    # If we've fallen off the bottom of the page,
+                    # let's go to the top of the next page
+                    if row >= pagerows:
+                        x0 += charwidth*(pagecols + 2*page_col_padding)
+                        row = row0
+                        y = y0
 
-            # If we're off the right side of the page,
-            # keep going till we hit a newline
-            if col + 1 >= pagecols:
-                continue
+                    # Reset the x coord
+                    x = x0
+                    col = col0
+                    continue
 
-            # This is whitespace
-            # Advance the x coord
-            if not len(word.strip()):
-                x += len(word)*charwidth
-                col += len(word)
+                # If we're off the right side of the page,
+                # keep going till we hit a newline
+                if col + 1 >= pagecols:
+                    continue
 
-            # Otherwise, this is a real live token
-            else:
-                # Get the color of the token. The ._styles attribute is a little
-                # hacky maybe, but less hacky than the .styles attribute, I think.
-                # The color is the first item in the list.
-                color = '#' + style._styles[ttype][0]
-
-                # If the word is longer than the rest of the space we have in this
-                # line, then cut it off.
-                wordlen = len(word)
-                if col + wordlen > pagecols:
-                    wordlen = pagecols - col
-
-                # Draw the damn thing, finally.
-                draw_rectangle(drawing, x, y, wordlen*charwidth, -charheight, color)
-
+                # This is whitespace
                 # Advance the x coord
-                x += wordlen*charwidth
-                col += wordlen
+                if len(word.strip()) == 0:
+                    x += len(word)*charwidth
+                    col += len(word)
+
+                # Otherwise, this is a real live token
+                else:
+                    # Get the color of the token. The ._styles attribute is a little
+                    # hacky maybe, but less hacky than the .styles attribute, I think.
+                    # The color is the first item in the list.
+                    color = '#' + style._styles[ttype][0]
+
+                    # If the word is longer than the rest of the space we have in this
+                    # line, then cut it off.
+                    wordlen = len(word)
+                    if col + wordlen > pagecols:
+                        wordlen = pagecols - col
+
+                    # Draw the damn thing, finally.
+                    draw_rectangle(drawing, x, y, wordlen*charwidth, -charheight, color)
+
+                    # Advance the x coord
+                    x += wordlen*charwidth
+                    col += wordlen
 
 
 #-----------------------------------------------------------------------------
