@@ -16,8 +16,8 @@ produce a PNG image which is a beautiful birdseye view of all the source code.
 Download this repository. Make sure you have Python 3. Maybe you need Python
 3.6 or something, I don't know.
 
-You'll need to install some packages, the names of which you can figure out
-by the error messages when you try to run the script. At least these:
+You'll need to install some packages, the names of which you can figure out by
+the error messages you get when you try to run the script. At least these:
 ```
 $ pip3 install drawSvg
 $ pip3 install pygments
