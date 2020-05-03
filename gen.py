@@ -13,7 +13,7 @@ import time, math, re, pdb
 import os.path, subprocess
 from pathlib import Path
 import drawSvg as draw
-from pygments.lexers import guess_lexer, guess_lexer_for_filename
+from pygments.lexers import guess_lexer_for_filename
 from pygments.styles import get_style_by_name
 
 # Start the timer
@@ -28,8 +28,10 @@ opts = {
     "input_directory": 'input',
     "output_filename": 'output/output.png',
     "ignore_hidden": True,      # ignore hidden files & folders
-    "style": get_style_by_name('solarized-dark'),
-    "use_zebra_bg": False,      # if true, alternates bg colors among files
+    "styles": [                 # will cycle through these, file to file
+            get_style_by_name('monokai'),
+            get_style_by_name('native')
+        ],
     "page_row_padding": 2,      # row units (includes linespacing)
     "page_col_padding": 4,      # column units
     "pagecols":    80,          # column units
@@ -74,16 +76,22 @@ def get_all_file_paths(dirname, ignore_hidden=True):
 
 # Get the contents of a file
 def get_contents(path):
-    print(now_time() + "Loading " + path.name)
-    with open(path.absolute()) as f:
-        contents = f.readlines()
+    print(now_time() + "Loading " + str(path))
 
-    # Remove trailing whitespace & replace tabs with spaces
-    contents = [line.rstrip() for line in contents]
-    contents = [line.replace('\t', '    ') for line in contents]
+    try:
+        with open(path.absolute()) as f:
+            contents = f.readlines()
 
-    # Return the blob
-    return ('\n'.join(contents)).strip()
+        # Remove trailing whitespace & replace tabs with spaces
+        contents = [line.rstrip() for line in contents]
+        contents = [line.replace('\t', '    ') for line in contents]
+
+        # Return the blob
+        return ('\n'.join(contents)).strip()
+
+    except BaseException as e:
+        print(now_time() + "Error: " + str(e))
+        return
 
 # Calculate all the delicious dimensional variables.
 # The way we do this is:
@@ -144,29 +152,6 @@ def calc_dimensions(opts, total_rows, numpages):
 def break_str_into_lines(string):
     return re.split(r'(\n)', string)
 
-# Lighten a color
-# - lighten(color, 1)    => color
-# - lighten(color, .95)  => something slightly lighter
-# - lighten(color, 1.05) => something slightly darker
-def lighten(hexcolor, fraction):
-    rgb = hex_to_rgb(hexcolor)
-    rgb = tuple(255 - fraction*(255 - float(c)) for c in rgb)
-    rgb = tuple(int(max(0,min(c,255))) for c in rgb)
-    return rgb_to_hex(rgb)
-
-# Convert a hex color to rgb
-def hex_to_rgb(hexcolor):
-    hexcolor = hexcolor.strip('#')
-    return tuple(int(hexcolor[i:i+2], 16) for i in (0, 2, 4))
-
-# Revert rgb color to hex
-def rgb_to_hex(rgb):
-    hexes = [hex(c)[2:] for c in rgb]
-    for (i, h) in enumerate(hexes):
-        if len(h) == 1:
-            hexes[i] = h + h
-    return '#' + ''.join(hexes)
-
 # The MVP of this program: a rectangle drawing funkitron
 def draw_rectangle(drawing, x, y, width, height, color):
     drawing.append(draw.Rectangle(x, y, width, height, fill=color))
@@ -180,7 +165,7 @@ def draw_rectangle(drawing, x, y, width, height, color):
 input_directory  = opts["input_directory"]
 output_filename  = opts["output_filename"]
 ignore_hidden    = opts["ignore_hidden"]
-style            = opts["style"]
+styles           = opts["styles"]
 use_zebra_bg     = opts["use_zebra_bg"]
 page_row_padding = opts["page_row_padding"]
 page_col_padding = opts["page_col_padding"]
@@ -198,9 +183,16 @@ aspect_ratio     = opts["aspect_ratio"]
 # - path.absolute() is the absolute path
 pathlist = get_all_file_paths(input_directory, ignore_hidden)
 
+# FIXME TODO ERROR BROKEN
+# Just below here we weed out certain files that fail to load.
+# BUT WE DON'T GET RID OF THEIR PATHS FROM THIS LIST
+# Which means our counting off down the line, and when we say
+# pathlist[k] it refers to a different file than linecounts[k].
+
 # Load up the contents of each file
 # Yeah, we hold it all in memory
 fileblobs = [get_contents(path) for path in pathlist]
+fileblobs = [blob for blob in fileblobs if blob is not None]
 
 # A list of the line counts
 linecounts = [len(blob.split('\n')) for blob in fileblobs]
@@ -214,21 +206,14 @@ total_rows = sum(linecounts) + 2*page_row_padding*(len(pathlist) - 1)
 # Determine the number of pages we'll need in order to fit the aspect ratio
 numpages, pagerows, width, height, actual_ratio = calc_page_and_image_vars(opts, total_rows)
 
-# The style defines a bg color for us
-bgcolor = style.background_color
-
-# Compute two shades, so we can alternate when file changes
-bgcolorlist = [lighten(bgcolor, 0.96), lighten(bgcolor, 1.02)]
-
-# But do we *really* want the zebra?
-if not use_zebra_bg:
-    bgcolorlist = [bgcolor]
+# This is useful to have
+bgcolorlist = [style.background_color for style in styles]
 
 # Create the drawing
 drawing = draw.Drawing(width, height, origin=(0,0), displayInline=False)
 
 # Draw the background
-drawing.append(draw.Rectangle(0, 0, width, height, fill=bgcolor))
+drawing.append(draw.Rectangle(0, 0, width, height, fill=bgcolorlist[0]))
 
 
 #-----------------------------------------------------------------------------
@@ -320,10 +305,16 @@ for (i, blob) in enumerate(fileblobs):
     linecount = linecounts[i]
 
     # Get the right lexer
-    lexer = guess_lexer_for_filename(filepath.name, blob)
+    try:
+        lexer = guess_lexer_for_filename(filepath.name, blob)
+    except BaseException as e:
+        print(now_time() + "Couldn't guess lexer for %s, using TextLexer" % pathlist[i].name)
+        # For some reason I get an error when I explicity use TextLexer,
+        # so here I deterministically "guess" it.
+        lexer = guess_lexer_for_filename('notes.txt', 'ignore me')
 
     # Buckle up, folks
-    print(now_time() + "Drawing %s (%s) %i lines" % (filepath.name, lexer.name, linecount))
+    print(now_time() + "Drawing %s (%s) %i lines" % (str(filepath), lexer.name, linecount))
 
     # Wanna buy some tokens?
     tokensource = lexer.get_tokens(blob)
@@ -383,7 +374,7 @@ for (i, blob) in enumerate(fileblobs):
                     # Get the color of the token. The ._styles attribute is a little
                     # hacky maybe, but less hacky than the .styles attribute, I think.
                     # The color is the first item in the list.
-                    color = '#' + style._styles[ttype][0]
+                    color = '#' + styles[i % len(styles)]._styles[ttype][0]
 
                     # If the word is longer than the rest of the space we have in this
                     # line, then cut it off.
