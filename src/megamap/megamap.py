@@ -213,9 +213,11 @@ def break_str_into_lines(string):
 # - lighten(color, .95)  => something slightly lighter
 # - lighten(color, 1.05) => something slightly darker
 def lighten(hexcolor, fraction):
+    # Convert hex to rgb
     rgb = hex_to_rgb(hexcolor)
-    rgb = tuple(255 - fraction*(255 - float(c)) for c in rgb)
-    rgb = tuple(int(max(0,min(c,255))) for c in rgb)
+    # Apply the fraction to each component
+    rgb = tuple(min(255, int(c * fraction)) for c in rgb)
+    # Convert back to hex
     return rgb_to_hex(rgb)
 
 # Convert a hex color to rgb
@@ -247,43 +249,43 @@ def main():
                        nargs='?',
                        default='megamap.png',
                        help='Output image filename in PNG format (default: megamap.png)')
-    parser.add_argument('-v', '--verbose',
-                       action='store_true',
-                       help='Enable verbose output')
-    parser.add_argument('-q', '--quiet',
-                       action='store_true',
-                       help='Suppress all output except errors')
-    parser.add_argument('--version',
-                    action='version',
-                    version=f'%(prog)s {__version__}',
-                    help='Show program version number and exit')
-    parser.add_argument('--list-styles',
-                    action='store_true',
-                    help='List available syntax highlighting styles and exit')
     parser.add_argument('-a', '--aspect-ratio',
                        type=float,
                        default=1.5,
                        help='Target aspect ratio (width/height) for the output image (default: 1.5)')
     parser.add_argument('-b', '--banner',
                        action='store_true',
-                       help='Enable banner mode (sets aspect ratio to 5.0)')
-    parser.add_argument('--include-hidden',
-                       action='store_true',
-                       help='Include hidden files and directories in the map')
-    parser.add_argument('-s', '--style',
-                       default='solarized-dark',
-                       help='Syntax highlighting style (use "random" for random style)')
-    parser.add_argument('-z', '--zebra',
-                       action='store_true',
-                       help='Enable zebra striping of background colors between files')
+                       help='Enable banner mode (sets target aspect ratio to 5.0)')
     parser.add_argument('-c', '--cols',
                        type=int,
                        default=80,
-                       help='Number of columns per page (default: 80)')
+                       help='Number of characters per line in output image (default: 80)')
+    parser.add_argument('--include-hidden',
+                       action='store_true',
+                       help='Include hidden files and directories')
+    parser.add_argument('--list-styles',
+                       action='store_true',
+                       help='List available syntax highlighting styles and exit')
+    parser.add_argument('-q', '--quiet',
+                       action='store_true',
+                       help='Suppress all output except errors')
+    parser.add_argument('-s', '--style',
+                       default='solarized-dark',
+                       help='Syntax highlighting style (use "random" for random style)')
+    parser.add_argument('-v', '--verbose',
+                       action='store_true',
+                       help='Enable verbose output')
+    parser.add_argument('--version',
+                       action='version',
+                       version=f'%(prog)s {__version__}',
+                       help='Print program version number and exit')
     parser.add_argument('-x', '--scale',
                        type=int,
                        default=1,
                        help='Pixel scale factor (must be integer, default: 1)')
+    parser.add_argument('-z', '--zebra',
+                       action='store_true',
+                       help='Enable zebra striping of background colors between files')
     
     # Start the timer
     start_time = time.time()
@@ -408,7 +410,7 @@ def main():
     bgcolor = style.background_color
 
     # Compute two shades, so we can alternate when file changes
-    bgcolorlist = [lighten(bgcolor, 0.96), lighten(bgcolor, 1.02)]
+    bgcolorlist = [lighten(bgcolor, 0.9), lighten(bgcolor, 1.1)]
 
     # But do we *really* want the zebra?
     if not use_zebra_bg:

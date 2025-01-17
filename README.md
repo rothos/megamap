@@ -10,7 +10,6 @@ Sublime. Give megamap a directory full of source code, and it will
 produce a PNG image which is a beautiful birdseye view of all the source code.
 
 
-
 ## Installation
 
 ```bash
@@ -23,20 +22,23 @@ pip install megamap
 megamap [input_directory] [output_filename]
 ```
 
+By default, `input_directory` = `.` and `output_filename` = `megamap.png`.
+
 Optional arguments:
 ```
--h, --help            Show this help message and exit
+-h, --help            show this help message and exit
+-a, --aspect-ratio ASPECT_RATIO
+                      Target aspect ratio (width/height) for the output image (default: 1.5)
+-b, --banner          Enable banner mode (sets target aspect ratio to 5.0)
+-c, --cols COLS       Number of characters per line in output image (default: 80)
+--include-hidden      Include hidden files and directories
+--list-styles         List available syntax highlighting styles and exit
+-q, --quiet           Suppress all output except errors
+-s, --style STYLE     Syntax highlighting style (use "random" for random style)
 -v, --verbose         Enable verbose output
--q, --quiet          Suppress all output except errors
---version            Show program version number and exit
---list-styles        List available syntax highlighting styles and exit
--a, --aspect-ratio   Target aspect ratio (width/height) for output image (default: 1.5)
--b, --banner         Enable banner mode (sets aspect ratio to 5.0)
---include-hidden     Include hidden files and directories in the map
--s, --style          Syntax highlighting style (use "random" for random style)
--z, --zebra          Enable zebra striping of background colors between files
--c, --cols           Number of columns per page (default: 80)
--x, --scale          Pixel scale factor (must be integer, default: 1)
+--version             Print program version number and exit
+-x, --scale SCALE     Pixel scale factor (must be integer, default: 1)
+-z, --zebra           Enable zebra striping of background colors between files
 ```
 
 The program will automatically:
