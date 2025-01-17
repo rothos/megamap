@@ -67,7 +67,7 @@ def get_all_file_paths(dirname, ignore_hidden=True, start_time=None, verbose=Fal
     skip_extensions = {
         '.txt', '.csv', '.json', '.xml', '.yaml', '.yml', 
         '.md', '.markdown', '.rst', '.log', '.conf', '.ini',
-        '.lock', '.toml', '.cfg', '.config'
+        '.lock', '.toml', '.cfg', '.config', '.pyc'
     }
 
     pathlist = []
@@ -99,8 +99,6 @@ def get_all_file_paths(dirname, ignore_hidden=True, start_time=None, verbose=Fal
 
 # Get the contents of a file
 def get_contents(path, start_time=None, verbose=False, quiet=False):
-    if not verbose and not quiet:
-        print(now_time(start_time) + "Loading " + path.name)
     try:
         with open(path.absolute(), 'r') as f:
             contents = f.readlines()
@@ -109,11 +107,15 @@ def get_contents(path, start_time=None, verbose=False, quiet=False):
         contents = [line.rstrip() for line in contents]
         contents = [line.replace('\t', '    ') for line in contents]
 
+        # Now that we know the file is valid, print the loading message with full path
+        if not verbose and not quiet:
+            print(now_time(start_time) + "Loading " + str(path.absolute()))
+
         # Return the blob
         return ('\n'.join(contents)).strip()
     except UnicodeDecodeError:
         if verbose:
-            print(now_time(start_time) + f"Skipping {path.name} - not a text file")
+            print(now_time(start_time) + f"Skipping {str(path.absolute())} - not a text file")
         return None
 
 # Calculate all the delicious dimensional variables.
@@ -408,7 +410,7 @@ def main():
 
         # Buckle up, folks
         if not opts["quiet"]:
-            print(now_time(start_time) + "Drawing %s (%s) %i lines" % (filepath.name, lexer.name, linecount))
+            print(now_time(start_time) + "Drawing %s (%s) %i lines" % (str(filepath.absolute()), lexer.name, linecount))
 
         # Wanna buy some tokens?
         tokensource = lexer.get_tokens(blob)
