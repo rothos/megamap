@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "megamap"
+version = "1.0.0"
+authors = [
+    { name = "Hrothgar", email = "hrothgarrrr@gmail.com" },
+]
+description = "Generate a visual map of your codebase"
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "drawsvg",
+    "pygments",
+]
+
+[project.scripts]
+megamap = "megamap:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/megamap"]

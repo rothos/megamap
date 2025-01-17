@@ -1,0 +1,1 @@
+from .megamap import main
