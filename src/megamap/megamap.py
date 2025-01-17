@@ -14,8 +14,13 @@ import os.path, subprocess
 import argparse
 from pathlib import Path
 import drawsvg as draw
-from pygments.lexers import guess_lexer, guess_lexer_for_filename
-from pygments.styles import get_style_by_name
+import pygments
+import pygments.styles
+import pygments.lexers
+from importlib.metadata import version
+import random
+
+__version__ = version("megamap")
 
 #-----------------------------------------------------------------------------
 # TELL ME WHAT YOU WANT BABY
@@ -26,7 +31,7 @@ def get_default_opts():
         "input_directory": '.',
         "output_filename": 'megamap.png',
         "ignore_hidden": True,      # ignore hidden files & folders
-        "style": get_style_by_name('solarized-dark'),
+        "style": pygments.styles.get_style_by_name('solarized-dark'),
         "use_zebra_bg": False,      # if true, alternates bg colors among files
         "page_row_padding": 2,      # row units (includes linespacing)
         "page_col_padding": 4,      # column units
@@ -70,7 +75,13 @@ def get_all_file_paths(dirname, ignore_hidden=True, start_time=None, verbose=Fal
         '.lock', '.toml', '.cfg', '.config', '.pyc'
     }
 
-    pathlist = []
+    if verbose:
+        print("Loading files:")
+
+    # Replace the simple pathlist collection with organized collection
+    base_files = []
+    dir_files = {}  # Dictionary to store directory -> files mapping
+    
     for path in Path(dirname).rglob('*'):
         # Ignore hidden files and directories
         if ignore_hidden and (path.name[0] == '.' or str(path)[0] == '.'):
@@ -83,17 +94,35 @@ def get_all_file_paths(dirname, ignore_hidden=True, start_time=None, verbose=Fal
         # Skip common non-code files
         if path.name in skip_files:
             if verbose:
-                print(now_time(start_time) + f"Skipping {path.name} - common non-code file")
+                print(now_time(start_time) + f"Skipping {path.absolute()} - common non-code file")
             continue
 
         # Skip files with non-code extensions
         if path.suffix.lower() in skip_extensions:
             if verbose:
-                print(now_time(start_time) + f"Skipping {path.name} - non-code file extension")
+                print(now_time(start_time) + f"Skipping {path.absolute()} - non-code file extension")
             continue
 
-        # She's a keeper
-        pathlist += [path]
+        # Determine if file is in base directory or subdirectory
+        parent = path.parent
+        if parent == Path(dirname):
+            base_files.append(path)
+        else:
+            if parent not in dir_files:
+                dir_files[parent] = []
+            dir_files[parent].append(path)
+
+    # Sort base files alphabetically
+    base_files.sort()
+    
+    # Sort directories alphabetically and sort their files
+    sorted_dirs = sorted(dir_files.keys())
+    dir_files = {dir_: sorted(dir_files[dir_]) for dir_ in sorted_dirs}
+    
+    # Combine all files in the desired order
+    pathlist = base_files
+    for dir_ in sorted_dirs:
+        pathlist.extend(dir_files[dir_])
 
     return pathlist
 
@@ -108,14 +137,17 @@ def get_contents(path, start_time=None, verbose=False, quiet=False):
         contents = [line.replace('\t', '    ') for line in contents]
 
         # Now that we know the file is valid, print the loading message with full path
-        if not verbose and not quiet:
+        if verbose and not quiet:
             print(now_time(start_time) + "Loading " + str(path.absolute()))
 
         # Return the blob
         return ('\n'.join(contents)).strip()
     except UnicodeDecodeError:
-        if verbose:
+        if verbose and not quiet:
             print(now_time(start_time) + f"Skipping {str(path.absolute())} - not a text file")
+        return None
+    except Exception as e:
+        print(now_time(start_time) + f"Error reading {str(path.absolute())}: {str(e)}")
         return None
 
 # Calculate all the delicious dimensional variables.
@@ -217,23 +249,84 @@ def main():
                        help='Output image filename in PNG format (default: megamap.png)')
     parser.add_argument('-v', '--verbose',
                        action='store_true',
-                       help='Enable verbose output including skipped files')
+                       help='Enable verbose output')
     parser.add_argument('-q', '--quiet',
                        action='store_true',
-                       help='Suppress all output except final status')
+                       help='Suppress all output except errors')
+    parser.add_argument('--version',
+                    action='version',
+                    version=f'%(prog)s {__version__}',
+                    help='Show program version number and exit')
+    parser.add_argument('--list-styles',
+                    action='store_true',
+                    help='List available syntax highlighting styles and exit')
+    parser.add_argument('-a', '--aspect-ratio',
+                       type=float,
+                       default=1.5,
+                       help='Target aspect ratio (width/height) for the output image (default: 1.5)')
+    parser.add_argument('-b', '--banner',
+                       action='store_true',
+                       help='Enable banner mode (sets aspect ratio to 5.0)')
+    parser.add_argument('--include-hidden',
+                       action='store_true',
+                       help='Include hidden files and directories in the map')
+    parser.add_argument('-s', '--style',
+                       default='solarized-dark',
+                       help='Syntax highlighting style (use "random" for random style)')
+    parser.add_argument('-z', '--zebra',
+                       action='store_true',
+                       help='Enable zebra striping of background colors between files')
+    parser.add_argument('-c', '--cols',
+                       type=int,
+                       default=80,
+                       help='Number of columns per page (default: 80)')
+    parser.add_argument('-x', '--scale',
+                       type=int,
+                       default=1,
+                       help='Pixel scale factor (must be integer, default: 1)')
+    
+    # Start the timer
+    start_time = time.time()
     
     # Parse args and merge with defaults
     args = parser.parse_args()
+    
+    # Handle --list-styles flag
+    if args.list_styles:
+        print("Available syntax highlighting styles:")
+        for style in sorted(pygments.styles.get_all_styles()):
+            print(f"  {style}")
+        return 0
+        
     opts = get_default_opts()
+    
+    # Update quiet/verbose first
     opts.update({
-        "input_directory": args.input_directory,
-        "output_filename": args.output_filename,
         "verbose": args.verbose,
         "quiet": args.quiet
     })
-
-    # Start the timer
-    start_time = time.time()
+    
+    # Handle random style selection
+    if args.style.lower() == 'random':
+        all_styles = list(pygments.styles.get_all_styles())
+        selected_style = random.choice(all_styles)
+        style = pygments.styles.get_style_by_name(selected_style)
+        if not opts["quiet"]:
+            print(now_time(start_time) + f"Using random style: {selected_style}")
+    else:
+        style = pygments.styles.get_style_by_name(args.style)
+    
+    # Update remaining options
+    opts.update({
+        "input_directory": args.input_directory,
+        "output_filename": args.output_filename,
+        "ignore_hidden": not args.include_hidden,
+        "style": style,
+        "use_zebra_bg": args.zebra,
+        "pagecols": args.cols,
+        "pixelscale": args.scale,
+        "aspect_ratio": 5.0 if args.banner else args.aspect_ratio
+    })
 
     # Yeah ok let's make this easier here
     input_directory  = opts["input_directory"]
@@ -260,32 +353,44 @@ def main():
     # Load up the contents of each file
     # Yeah, we hold it all in memory
     fileblobs = [get_contents(path, start_time, opts["verbose"], opts["quiet"]) for path in pathlist]
-    # Filter out None values from non-text files
-    fileblobs = [blob for blob in fileblobs if blob is not None]
-    pathlist = [path for path, blob in zip(pathlist, fileblobs) if blob is not None]
+    
+    # Filter out None values from non-text files (in a single pass to maintain alignment)
+    valid_items = [(path, blob) for path, blob in zip(pathlist, fileblobs) if blob is not None]
+    pathlist = [item[0] for item in valid_items]
+    fileblobs = [item[1] for item in valid_items]
+    
+    if opts["verbose"]:
+        print("\nAfter filtering non-text files:")
+        for path, blob in zip(pathlist, fileblobs):
+            print(f"Path: {path.absolute()} - Content length: {len(blob) if blob else 'None'}")
 
     #-----------------------------------------------------------------------------
     # PREPROCESSING
     #-----------------------------------------------------------------------------
-    
-    # Start the timer
-    start_time = time.time()
 
     # Try to get lexers for each file, skip files where no lexer is found
     valid_files = []
     valid_blobs = []
+    if opts["verbose"]:
+        print("\nValidating lexers for files:")
     for path, blob in zip(pathlist, fileblobs):
         try:
-            lexer = guess_lexer_for_filename(path.name, blob)
+            lexer = pygments.lexers.guess_lexer_for_filename(path.absolute(), blob)
             valid_files.append(path)
             valid_blobs.append(blob)
-        except:
             if opts["verbose"]:
-                print(now_time(start_time) + f"Skipping {path.name} - no lexer found")
+                print(f"✓ {path.absolute()} - Valid lexer found: {lexer.name}")
+        except Exception as e:
+            if opts["verbose"]:
+                print(f"✗ {path.absolute()} - Lexer error: {str(e)}")
+                print(now_time(start_time) + f"Skipping {path.absolute()} - no lexer found")
 
     # Update our lists to only include files with valid lexers
     pathlist = valid_files
     fileblobs = valid_blobs
+    
+    if not opts["quiet"]:
+        print(now_time(start_time) + f"{len(pathlist)} valid files found")
 
     # A list of the line counts
     linecounts = [len(blob.split('\n')) for blob in fileblobs]
@@ -319,6 +424,9 @@ def main():
     #-----------------------------------------------------------------------------
     # MEGAMAP GO BRRR
     #-----------------------------------------------------------------------------
+
+    if opts["verbose"]:
+        print("\nCalculating aspect ratio:")
 
     # Print the final ratio & the target
     if not opts["quiet"]:
@@ -376,6 +484,8 @@ def main():
     y = y0 = page_row_padding*(charheight + linespacing)
 
     # Loop through each of the files & draw away
+    if opts["verbose"]:
+        print("\nDrawing files:")
     for (i, blob) in enumerate(fileblobs):
         if i > 0:
             # Add the inter-file padding
@@ -398,10 +508,15 @@ def main():
         linecount = linecounts[i]
 
         # Get the right lexer
-        lexer = guess_lexer_for_filename(filepath.name, blob)
+        try:
+            lexer = pygments.lexers.guess_lexer_for_filename(filepath.absolute(), blob)
+        except Exception as e:
+            if opts["verbose"]:
+                print(f"Error getting lexer for {filepath.absolute()}: {str(e)}")
+            continue
 
         # Buckle up, folks
-        if not opts["quiet"]:
+        if opts["verbose"]:
             print(now_time(start_time) + "Drawing %s (%s) %i lines" % (str(filepath.absolute()), lexer.name, linecount))
 
         # Wanna buy some tokens?
@@ -480,16 +595,21 @@ def main():
     # GOD SAVE THE SCENE
     #-----------------------------------------------------------------------------
 
+    if opts["verbose"]:
+        print("\nSaving output:")
+
     # Save the drawing
     resx, resy = (width*pixelscale, height*pixelscale)
-    print(now_time(start_time) + "Saving %s (%ix%ipx)" % (output_filename, resx, resy))
+    if not opts["quiet"]:
+        print(now_time(start_time) + "Saving %s (%ix%ipx)" % (output_filename, resx, resy))
     drawing.set_pixel_scale(pixelscale)
     drawing.save_png(output_filename)
 
     # Let's hope it was fast
     end_time = time.time()
     total_time = end_time - start_time
-    print(now_time(start_time) + 'Done.')
+    if not opts["quiet"]:
+        print(now_time(start_time) + 'Done.')
     
     return 0
 

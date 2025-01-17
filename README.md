@@ -6,61 +6,44 @@
 # Megamap
 
 Megamap is a mega awesome version of the minimap feature of text editors like
-Sublime and Atom. Give megamap a directory full of source code, and it will
+Sublime. Give megamap a directory full of source code, and it will
 produce a PNG image which is a beautiful birdseye view of all the source code.
 
 
 
 ## Installation
 
-Download this repository. Make sure you have Python 3. Maybe you need Python
-3.6 or something, I don't know.
-
-You'll need to install some packages, the names of which you can figure out by
-the error messages you get when you try to run the script. At least these:
-```
-$ pip3 install drawSvg
-$ pip3 install pygments
-```
-Maybe Cairo something too. It's 5am and I don't remember anything.
-
-
-
-## Getting started
-
-Put your input (could be any text files; source code works well -- although
-maybe a book of poetry would be cool too) into a subdirectory of the project,
-call it `input/`. Then run
-```
-$ python3 gen.py
-```
-If you're lucky it'll work. There might be errors. This has not been
-extensively tested. In fact, I just now got it working.
-
-At the beginning of the script there are a bunch of (what I hope are)
-self-explanatory options. (A "page" is a column of the output image.)
-```
-opts = {
-    "input_directory": 'input',
-    "output_filename": 'output.png',
-    "ignore_hidden": True,      # ignore hidden files & folders
-    "style": get_style_by_name('monokai'),
-    "use_zebra_bg": False,      # if true, alternates bg colors among files
-    "page_row_padding": 2,      # row units (includes linespacing)
-    "page_col_padding": 4,      # column units
-    "pagecols":    80,          # column units
-    "charheight":   1,          # px
-    "charwidth":    1,          # px
-    "linespacing":  1,          # px
-    "pixelscale":   1           # dimensionless
-}
-
-# Aspect ratio is width/height. The program will calculate things to make the
-# aspect ratio as close as possible to what is specified. Right now it can't
-# guarantee exactness.
-opts["aspect_ratio"] = 1.5
+```bash
+pip install megamap
 ```
 
+## Usage
+
+```bash
+megamap [input_directory] [output_filename]
+```
+
+Optional arguments:
+```
+-h, --help            Show this help message and exit
+-v, --verbose         Enable verbose output
+-q, --quiet          Suppress all output except errors
+--version            Show program version number and exit
+--list-styles        List available syntax highlighting styles and exit
+-a, --aspect-ratio   Target aspect ratio (width/height) for output image (default: 1.5)
+-b, --banner         Enable banner mode (sets aspect ratio to 5.0)
+--include-hidden     Include hidden files and directories in the map
+-s, --style          Syntax highlighting style (use "random" for random style)
+-z, --zebra          Enable zebra striping of background colors between files
+-c, --cols           Number of columns per page (default: 80)
+-x, --scale          Pixel scale factor (must be integer, default: 1)
+```
+
+The program will automatically:
+- Skip common non-code files (LICENSE, README, etc.)
+- Skip files with non-code extensions (.txt, .md, .json, etc.)
+- Skip binary and non-text files
+- Skip files without a valid syntax highlighter
 
 
 ## Pretty pictures
@@ -83,34 +66,19 @@ Source code of entire projects can be elegantly illustrated:
 </p>
 
 
+## FAQ
 
-## Questions I might ask myself in the future when I come back and look at this
+### How are the files sorted?
+
+The files are sorted alphabetically by directory and then by file name,
+with files in the base directory first.
 
 ### How do I find out what all the syntax highlighting styles are called?
 
-```
-from pygments.styles import STYLE_MAP
-STYLE_MAP.keys()
-```
-I get this output:
-```
-dict_keys(['default', 'emacs', 'friendly', 'colorful', 'autumn', 'murphy', 'manni', 'monokai', 'perldoc', 'pastie', 'borland', 'trac', 'native', 'fruity', 'bw', 'vim', 'vs', 'tango', 'rrt', 'xcode', 'igor', 'paraiso-light', 'paraiso-dark', 'lovelace', 'algol', 'algol_nu', 'arduino', 'rainbow_dash', 'abap', 'solarized-dark', 'solarized-light', 'sas', 'stata', 'stata-light', 'stata-dark', 'inkpot'])
-```
-
-### Can you sort the input files somehow?
-
-The `pathlib` module seems to order them out randomly, it's weird. But yeah
-there is no built-in feature to do this. It wouldn't be hard to modify the
-code to do it.
-
-### Is there a way to put a pretty border or frame around the image?
-
-Not right now. Try imagemagick or something. Or submit a pull request.
+You can either:
+1. Run `megamap --list-styles` to see all available styles
+2. Use `random` as the style to let megamap choose one randomly
 
 ### What about word wrapping?
 
-Hahahaha.
-
-Hahahahahahaahahahahahahahahahaahahaha.
-
-No.
+Not currently supported.
