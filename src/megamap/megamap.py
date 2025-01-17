@@ -329,20 +329,18 @@ def main():
     row = row0 = 0
     x = 0
     dx = charwidth*(pagecols + 2*page_col_padding)
-    y0 = height
+    y0 = 0
     ya = yb = y0
     dy = page_row_padding*(charheight + linespacing)
 
     # Pretend to loop through the files, draw some bg rects
     i = 0
     for i in range(len(fileblobs)):
-
         # If we've just finished a file,
         # draw a freakin 'tangle
         if i > 0:
-
             # Add the inter-file padding
-            yb  -= 2*dy
+            yb  += 2*dy
             row += 2*page_row_padding
 
             # Draw a freakin 'tangle
@@ -353,23 +351,21 @@ def main():
 
         # Pretend to loop through lines
         for j in range(linecounts[i]):
-
             # Next line
-            yb  -= charheight + linespacing
+            yb  += charheight + linespacing
             row += 1
 
             # If we've fallen off the bottom of the page,
             # let's go to the top of the next page
             if row >= pagerows:
-                yb -= 2*dy
+                yb += 2*dy
                 draw_rectangle(drawing, x, ya, dx, yb-ya, bgcolorlist[i % len(bgcolorlist)])
                 x += dx
                 row = row0
                 ya = yb = y0
 
     # Finish off dat last 'tangle
-    # We draw to -ya because then it's guaranteed to go to the bottom of the drawing
-    draw_rectangle(drawing, x, ya, dx, -ya, bgcolorlist[i % len(bgcolorlist)])
+    draw_rectangle(drawing, x, ya, dx, height-ya, bgcolorlist[i % len(bgcolorlist)])
 
     #-----------------------------------------------------------------------------
     # Ok now draw the word blockies
@@ -377,17 +373,13 @@ def main():
     # Initial coordinates
     row = col = row0 = col0 = 0
     x = x0 = page_col_padding*charwidth
-    y = y0 = height - page_row_padding*(charheight + linespacing)
+    y = y0 = page_row_padding*(charheight + linespacing)
 
     # Loop through each of the files & draw away
     for (i, blob) in enumerate(fileblobs):
-
-        # If we've just finished a file & are starting
-        # to draw a new one, add some padding
         if i > 0:
-
             # Add the inter-file padding
-            y   -= 2*page_row_padding*(charheight + linespacing)
+            y   += 2*page_row_padding*(charheight + linespacing)
             row += 2*page_row_padding
 
             # If we've fallen off the bottom of the page,
@@ -437,9 +429,8 @@ def main():
 
                     # Break to the next line, resetting/updating the coordinates
                     if word == '\n':
-
                         # Next line
-                        y   -= charheight + linespacing
+                        y   += charheight + linespacing
                         row += 1
 
                         # If we've fallen off the bottom of the page,
@@ -479,7 +470,7 @@ def main():
                             wordlen = pagecols - col
 
                         # Draw the damn thing, finally.
-                        draw_rectangle(drawing, x, y, wordlen*charwidth, -charheight, color)
+                        draw_rectangle(drawing, x, y, wordlen*charwidth, charheight, color)
 
                         # Advance the x coord
                         x += wordlen*charwidth
